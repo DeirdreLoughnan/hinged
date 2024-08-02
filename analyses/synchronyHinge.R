@@ -29,7 +29,7 @@ if(length(grep("deirdreloughnan", getwd()) > 0)) {
   setwd("/home/deirdre/Synchrony") # for midge
 }
 
-
+setwd("~/Documents/github/hinged")
 ##################################################################
 # Taking the phylogney code from OSPREE and trying to adapt it for my synchrony project:
 #get the synchrony data
@@ -191,6 +191,8 @@ preSlope <- data.frame(sum[grep("beta1\\[", rownames(sum)), c("mean","2.5%", "97
 
 postSlope <- data.frame(sum[grep("beta2\\[", rownames(sum)), c("mean","2.5%", "97.5%", "n_eff", "Rhat")])
 
+int <- data.frame(sum[grep("alpha\\[", rownames(sum)), c("mean","2.5%", "97.5%", "n_eff", "Rhat")])
+
 col.sp <- c(rgb(204 / 255, 102 / 255, 119 / 255, alpha = 0.8), rgb(68 / 255, 170 / 255, 153 / 255, alpha = 0.5))
 
 hist(postSlope$mean*10, col = col.sp[1], main = NA, breaks = 25, xlab = "Shift in phenology (days/decade)", ylim = c(0, 1000))
@@ -201,9 +203,53 @@ legend("topright",legend = c("pre-1980", "post-1980"),
 
 mdlOut <- data.frame(speciesPheno = unique(sort(final.t$sp.pheno)), 
   pre1980 = preSlope$mean, 
-  post1980 = postSlope$mean)
+  post1980 = postSlope$mean,
+  alpha = int$mean)
 
 hist((mdlOut$post1980-mdlOut$pre1980), main = NA)
 # top three biggest changes pre-post climate change are all amphibians
 
 mdlOut$diff <- mdlOut$post1980-mdlOut$pre1980
+row.names(mdlOut) <- mdlOut$speciesPheno
+
+#######################################################
+# plot the raw data and whether the model output fits
+
+dat <- subset(final.t, sp.pheno == "Acer_campestre_flowering")
+
+pm.0 <- mdlOut["Acer_campestre_flowering", "pre1980"] * min(dat$yr1980) + mdlOut["Acer_campestre_flowering", "alpha"]
+pm.1 <- mdlOut["Acer_campestre_flowering", "pre1980"] * 0 + mdlOut["Acer_campestre_flowering", "alpha"]
+
+pm.2 <- mdlOut["Acer_campestre_flowering", "post1980"] * 0 + mdlOut["Acer_campestre_flowering", "alpha"]
+pm.3 <- mdlOut["Acer_campestre_flowering", "post1980"] * max(dat$yr1980) + mdlOut["Acer_campestre_flowering", "alpha"]
+
+pdf("analyses/figures/Acer_campestre_2hinge.pdf", width =3, height = 3)
+plot(doy~year, data = dat, type="l", ylim = c(100,200), col = "darkslategrey", ylab = "Day of year", xlab = "Year", cex = 3,lwd =2, main = paste("Acer_campestre_flowering", round(mdlOut["Acer_campestre_flowering", "pre1980"],3),  round(mdlOut["Acer_campestre_flowering", "post1980"],3), sep = "_" ))
+points(doy~year, data=dat, cex=0.6, col = "darkslategrey", pch =19)
+abline((lm(doy~year, data=dat)), lty =2,lwd =2)
+segments(x0 = min(dat$year), x1 = 1980, y0 = pm.0, y1 = pm.1 ,lwd =2)
+segments(x0 = 1980, x1 = max(dat$year), y0 = pm.2, y1 = pm.3,lwd =2)
+dev.off()
+
+
+### 
+spPheno <- "Bupalus_piniaria_abundance"
+spPheno <- "Macoma_balthica_spawning"
+spPheno <- "Pagodroma_nivea_egg_laying"
+spPheno <- "Pseudacris_crucifer_first_appearance"
+dat <- subset(final.t, sp.pheno == spPheno)
+
+dat <- dat[order(dat$year),]
+pm.0 <- mdlOut[spPheno, "pre1980"] * min(dat$yr1980) + mdlOut[spPheno, "alpha"]
+pm.1 <- mdlOut[spPheno, "pre1980"] * 0 + mdlOut[spPheno, "alpha"]
+
+pm.2 <- mdlOut[spPheno, "post1980"] * 0 + mdlOut[spPheno, "alpha"]
+pm.3 <- mdlOut[spPheno, "post1980"] * max(dat$yr1980) + mdlOut[spPheno, "alpha"]
+
+pdf(paste("analyses/figures/", spPheno, ".pdf", sep = ""), width = 5, height = 5)
+plot(doy~year, data = dat, type="l", ylim = c(0,300), col = "darkslategrey", ylab = "Day of year", xlab = "Year", cex = 3,lwd =2, main = paste(spPheno, round(mdlOut[spPheno, "pre1980"],3),  round(mdlOut[spPheno, "post1980"],3), sep = "_" ))
+points(doy~year, data=dat, cex=0.6, col = "darkslategrey", pch =19)
+#abline((lm(doy~year, data=dat)), lty =2,lwd =2)
+segments(x0 = min(dat$year), x1 = 1980, y0 = pm.0, y1 = pm.1 ,lwd =2)
+segments(x0 = 1980, x1 = max(dat$year), y0 = pm.2, y1 = pm.3,lwd =2)
+dev.off()
