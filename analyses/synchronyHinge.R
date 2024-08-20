@@ -5,7 +5,7 @@ rm(list = ls())
 options(mc.cores = parallel::detectCores())
 options(stringsAsFactors = FALSE)
 
-library(colormap)
+#library(colormap)
 # library(phytools)
 # library(ape)
 require(rstan)
@@ -25,20 +25,19 @@ if(length(grep("deirdreloughnan", getwd()) > 0)) {
   setwd("/home/deirdre/Synchrony") # for midge
 }
 
-dat <- read.csv("synchronyData.csv")
+dat <- read.csv("output/synchronyData.csv")
 
-datalist <- append(list(N = nrow(dat),
+datalist <- list(N = nrow(dat),
                         N_grid = length(unique(dat$sp.pheno)),
                         x0 = 1980,
                         # Nstudy = length(unique(dat$studyid)),
                         y = dat$doy,
                         species = dat$pheno.fact,
                         # study = dat$study.fact,
-                        x = dat$year), phypriors)
-
+                        x = dat$year)
 
 mdlHinge <- 
-  stan("Stan/stan_programs/fit_flex_hinge_dl.stan",
+  stan("..//hinged/analyses/stan/fit_flex_hinge.stan",
        data = datalist,
        init = simu_inits,
        iter = 4000,
@@ -48,7 +47,7 @@ mdlHinge <-
        refresh = 20
   )
 
-save( mdlHinge, file = "output/synchronyHinge.Rda")
+save( mdlHinge, file = "..//hinged/analyses/output/synchronyHinge.Rda")
 
 ### Adding partial pooling across species
 
@@ -62,7 +61,7 @@ datalistSp <- list(N = nrow(dat),
   x = dat$year)
 
 mdlSp <-
-  stan("Stan/stan_programs/fit_flex_hinge_sp.stan",
+  stan("..//hinged/analyses/stan/fit_flex_hinge_sp.stan",
     data = datalistSp,
     iter = 4000,
     warmup = 3000,
@@ -71,7 +70,7 @@ mdlSp <-
     #refresh = 20
   )
 
-save( mdlSp, file = "output/synchronyHingeSpecies.Rda")
+save( mdlSp, file = "..//hinged/analyses/output/synchronyHingeSpecies.Rda")
 
 sum <- summary(mdlSp)$summary
 
@@ -92,7 +91,7 @@ datalistStudy <- list(N = nrow(dat),
   x = dat$year)
 
 mdlStudy <- 
-  stan("Stan/stan_programs/fit_flex_hinge_sp_study.stan",
+  stan("..//hinged/analyses/stan/fit_flex_hinge_sp_study.stan",
     data = datalistStudy,
     iter = 4000,
     warmup = 3000,
@@ -103,7 +102,13 @@ mdlStudy <-
 
 save(mdlStudy, file = "..//hinged/analyses/output/hingeSpeciesStudyYpred.Rda")
 
+sum <- summary(mdlStudy)$summary
 
+slopes <- sum[c("mu_beta1", "mu_grand", "mu_beta2","sigma_sp","sigma_study", "sigma_b1", "sigma_b2", "sigma"), c("mean","2.5%", "97.5%", "n_eff", "Rhat")]
+
+slopes
+
+# ESS low
 ##########################################################################################
 # mikes utility plots and diagnostics
 util <- new.env()
