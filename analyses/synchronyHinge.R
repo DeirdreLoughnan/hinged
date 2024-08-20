@@ -1,19 +1,15 @@
 # February 20, 2024
 # Aim of this code is to test whether having a second slope better informs the synchrony model:
-
-# This code was started June 22
-# The aim is to load the phylogeny and change the species names to the class names
+# In addition, have since added partial pooling on species and study-level variation
 rm(list = ls()) 
 options(mc.cores = parallel::detectCores())
 options(stringsAsFactors = FALSE)
 
-#source('stan_utility_rstan.R', local=util)
-
 library(colormap)
-library(phytools)
-library(ape)
+# library(phytools)
+# library(ape)
 require(rstan)
-require(caper)
+# require(caper)
 require(shinystan)
 require(reshape2)
 library(stringr)
@@ -29,94 +25,19 @@ if(length(grep("deirdreloughnan", getwd()) > 0)) {
   setwd("/home/deirdre/Synchrony") # for midge
 }
 
-#setwd("~/Documents/github/hinged")
-##################################################################
-# Taking the phylogney code from OSPREE and trying to adapt it for my synchrony project:
-#get the synchrony data
-#source("Rcode/combiningallphenodata.R")
-dat.fin <- read.csv("Input/dat_fin_Dec2021_w_neg.csv")
-most <- dat.fin[,c("year", "doy", "species", "phenophase", "studyid", "datasource", "yr1980","species.name")]
-final.t <- most[complete.cases(most), ]  # there are five rows of the seabird data that doesn't 
-final.t$species_fact <- as.numeric(as.factor(final.t$species.name))
-final.t$study.fact <- as.numeric(as.factor(final.t$studyid))
+dat <- read.csv("synchronyData.csv")
 
-#make a matching species name and spname pheno column
-final.t$temp <- final.t$species.name
-temp <- str_split_fixed(final.t$temp, " ", 2)
-final.t$phylo.name <- paste(temp[,1], temp[,2], sep="_")
-
-final.t$phenophase[final.t$phenophase == "egg laying"] <- "egg_laying"
-final.t$phenophase[final.t$phenophase == "first cut"] <- "first_cut"
-final.t$phenophase[final.t$phenophase == "juveniles first seen"] <- "juveniles_first_seen"
-final.t$phenophase[final.t$phenophase == "population growth"] <- "population_growth"
-final.t$phenophase[final.t$phenophase == "last cut"] <- "last_cut"
-final.t$phenophase[final.t$phenophase == "switch date"] <- "switch_date"
-final.t$phenophase[final.t$phenophase == "first appearance"] <- "first_appearance"
-final.t$phenophase[final.t$phenophase == "first ripe fruit"] <- "first_ripe_fruit"
-final.t$phenophase[final.t$phenophase == "gathering for departure"] <- "gathering_for_departure"
-final.t$phenophase[final.t$phenophase == "last appearance"] <- "last_appearance"
-final.t$phenophase[final.t$phenophase == "peak abundnace"] <- "abundance"
-final.t$phenophase[final.t$phenophase == "reproduction" & final.t$species.name == "Ptychoramphus aleuticus"] <- "egg_laying"
-
-final.t$phylo.name[final.t$phylo.name == "Hyacinthoides_x variabilis"] <- "Hyacinthoides_x_variabilis"
-final.t$phylo.name[final.t$phylo.name == "Adelgidae_and Phylloxeridae spp"] <- "Adelgidae_and_Phylloxeridae_spp"
-final.t$phylo.name[final.t$phylo.name == "Taraxacum_sect. Erythrosperma"] <- "Taraxacum_sect._Erythrosperma"
-final.t$phylo.name[final.t$phylo.name == "Daucus_carota carota"] <- "Daucus_carota_carota"
-final.t$phylo.name[final.t$phylo.name == "Polygonum_aviculare ss"] <- "Polygonum_aviculare_ss"
-final.t$phylo.name[final.t$phylo.name == "Tilia_x europaea"] <- "Tilia_x_europaea"
-final.t$phylo.name[final.t$phylo.name == "Populus_x canescens"] <- "Populus_x_canescens"
-final.t$phylo.name[final.t$phylo.name == "Symphytum_x uplandicum"] <- "Symphytum_x_uplandicum"
-
-final.t$sp.pheno <- paste(final.t$phylo.name, final.t$phenophase, sep = "_")
-final.t$sp.pheno <- str_replace(final.t$sp.pheno, "__", "_")
-final.t$sp.pheno <- str_replace(final.t$sp.pheno, " ", "")
-
-# tree <- read.tree("Input/synchronyTree.tre")
-# 
-# #get spp and phylo matrix in the same order
-# head(tree$tip.label)
-# length(tree$tip.label) #1280
-# 
-# treeSpp <- tree$tip.label#1279 - bombus_first_appearance was duplicated
-# datSpp <- unique(final.t$sp.pheno)#1279
-# # Full phylogeny
-# d <- final.t[match(tree$tip.label, final.t$phylo.name),]
-# d$sp.pheno <- str_replace(d$sp.pheno, "__", "_")
-# d$sp.pheno <- str_replace(d$sp.pheno, " ", "")
-# 
-# phymatch <- data.frame(sp.pheno = tree$tip.label, sppnum = c(1:length(tree$tip.label)))
-# phymatch$sp.pheno <- str_replace(phymatch$sp.pheno, "__", "_")
-# phymatch$sp.pheno <- str_replace(phymatch$sp.pheno, " ", "")
-# 
-# d <- merge(final.t, phymatch, by="sp.pheno")
-# length(unique(final.t$sp.pheno))
-# 
-# temp <- phymatch[is.na(match(phymatch$sp.pheno,final.t$sp.pheno)),]; dim(temp)
-# temp <- final.t[is.na(match(final.t$sp.pheno,tree$tip.label)),]; dim(temp)
-# 
-# d <- d[order(d$sppnum),]
-# nspecies <- max(d$sppnum)
-# #nspecies <- 1275
-# cophen_tree <- cophenetic(tree)
-# vcv_tree <- vcv(tree, cor = TRUE)
-# 
-# final.t$pheno.fact <- as.numeric(as.factor(final.t$sp.pheno))
-# length(unique(final.t$sp.pheno)) #1275 w/o thackeray 789
-
-
-
-
-datalist <- append(list(N = nrow(final.t),
-                        N_grid = nspecies,
+datalist <- append(list(N = nrow(dat),
+                        N_grid = length(unique(dat$sp.pheno)),
                         x0 = 1980,
-                        # Nstudy = length(unique(final.t$studyid)),
-                        y = final.t$doy,
-                        species = final.t$pheno.fact,
-                        # study = final.t$study.fact,
-                        x = final.t$year), phypriors)
+                        # Nstudy = length(unique(dat$studyid)),
+                        y = dat$doy,
+                        species = dat$pheno.fact,
+                        # study = dat$study.fact,
+                        x = dat$year), phypriors)
 
 
-mdlHinge <- #stan("Stan/phylogeny_synchrony_cholesky_grandmean.stan",
+mdlHinge <- 
   stan("Stan/stan_programs/fit_flex_hinge_dl.stan",
        data = datalist,
        init = simu_inits,
@@ -131,16 +52,16 @@ save( mdlHinge, file = "output/synchronyHinge.Rda")
 
 ### Adding partial pooling across species
 
-datalistSp <- append(list(N = nrow(final.t),
-  Nspp = nspecies,
+datalistSp <- list(N = nrow(dat),
+  Nspp = length(unique(dat$sp.pheno)),
   x0 = 1980,
-  # Nstudy = length(unique(final.t$studyid)),
-  y = final.t$doy,
-  species = final.t$pheno.fact,
-  # study = final.t$study.fact,
-  x = final.t$year), phypriors)
+  Nstudy = length(unique(dat$studyid)),
+  y = dat$doy,
+  species = dat$pheno.fact,
+  # study = dat$study.fact,
+  x = dat$year)
 
-mdlSp <- #stan("Stan/phylogeny_synchrony_cholesky_grandmean.stan",
+mdlSp <-
   stan("Stan/stan_programs/fit_flex_hinge_sp.stan",
     data = datalistSp,
     iter = 4000,
@@ -161,28 +82,139 @@ slopes
 #######################################################
 ### Adding partial pooling across species and study
 
-datalistSp <- append(list(N = nrow(final.t),
-  Nspp = nspecies,
+datalistStudy <- list(N = nrow(dat),
+  Nspp = length(unique(dat$sp.pheno)),
   x0 = 1980,
-  # Nstudy = length(unique(final.t$studyid)),
-  y = final.t$doy,
-  species = final.t$pheno.fact,
-  # study = final.t$study.fact,
-  x = final.t$year), phypriors)
+  Nstudy = length(unique(dat$studyid)),
+  y = dat$doy,
+  species = dat$pheno.fact,
+  study = dat$study.fact,
+  x = dat$year)
 
-mdlSp <- #stan("Stan/phylogeny_synchrony_cholesky_grandmean.stan",
-  stan("Stan/stan_programs/fit_flex_hinge_sp.stan",
-    data = datalistSp,
+mdlStudy <- 
+  stan("Stan/stan_programs/fit_flex_hinge_sp_study.stan",
+    data = datalistStudy,
     iter = 4000,
     warmup = 3000,
     chains = 4,
     #seed = 62921,
-    #refresh = 20
+    refresh = 20
   )
 
-save( mdlSp, file = "output/synchronyHingeSpecies.Rda")
+save(mdlStudy, file = "..//hinged/analyses/output/hingeSpeciesStudyYpred.Rda")
 
 
+##########################################################################################
+# mikes utility plots and diagnostics
+util <- new.env()
+source('..//hinged/analyses/stan_utility_rstan.R', local=util)
+
+diagnostics <- util$extract_hmc_diagnostics(mdlStudy)
+util$check_all_hmc_diagnostics(diagnostics)
+# All Hamiltonian Monte Carlo diagnostics are consistent with reliable Markov chain Monte Carlo.
+
+samples <- util$extract_expectands(mdlStudy)
+util$check_all_expectand_diagnostics(samples)
+# All expectands checked appear to be behaving well enough for reliable Markov chain Monte Carlo estimation.
+
+# Retrodictive checks
+hist_retro <- function(obs, samples, pred_names,
+  bin_min, bin_max, delta,
+  xlab="", display_ylim=NULL, title="") {
+  if (is.na(bin_min)) bin_min <- min(pred)
+  if (is.na(bin_max)) bin_max <- max(pred)
+  breaks <- seq(bin_min, bin_max, delta)
+  B <- length(breaks) - 1
+  idx <- rep(1:B, each=2)
+  xs <- sapply(1:length(idx),
+    function(b) if(b %% 2 == 0) breaks[idx[b] + 1]
+    else                        breaks[idx[b]] )
+  obs_counts <- hist(obs[bin_min < obs & obs < bin_max], breaks=breaks, plot=FALSE)$counts
+  pad_obs_counts <- do.call(cbind,
+    lapply(idx, function(n) obs_counts[n]))
+  pred <- sapply(pred_names,
+    function(name) c(t(samples[[name]]), recursive=TRUE))
+  N <- dim(pred)[1]
+  pred_counts <- sapply(1:N,
+    function(n) hist(pred[n,][bin_min < pred[n,] & pred[n,] < bin_max],
+      breaks=breaks,
+      plot=FALSE)$counts)
+  probs = c(0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9)
+  cred <- sapply(1:B,
+    function(b) quantile(pred_counts[b,], probs=probs))
+  pad_cred <- do.call(cbind, lapply(idx, function(n) cred[1:9, n]))
+  
+  if (is.null(display_ylim)) {
+    display_ylim <- c(0, max(c(obs_counts, cred[9,])))
+  }
+  
+  plot(1, type="n", main=title,
+    xlim=c(bin_min, bin_max), xlab=xlab,
+    ylim=display_ylim, ylab="Counts")
+  polygon(c(xs, rev(xs)), c(pad_cred[1,], rev(pad_cred[9,])),
+    col = c_light, border = NA)
+  polygon(c(xs, rev(xs)), c(pad_cred[2,], rev(pad_cred[8,])),
+    col = c_light_highlight, border = NA)
+  polygon(c(xs, rev(xs)), c(pad_cred[3,], rev(pad_cred[7,])),
+    col = c_mid, border = NA)
+  polygon(c(xs, rev(xs)), c(pad_cred[4,], rev(pad_cred[6,])),
+    col = c_mid_highlight, border = NA)
+  lines(xs, pad_cred[5,], col=c_dark, lwd=2)
+  lines(xs, pad_obs_counts, col="white", lty=1, lw=2.5)
+  lines(xs, pad_obs_counts, col="black", lty=1, lw=2)
+}
+
+plot_cont_marginal_quantiles <- function(xs, preds, 
+  display_xlim=NULL, display_ylim=NULL, 
+  title="", x_name="", y_name="") {
+  probs = c(0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9)
+  cred <- sapply(preds, function(pred) quantile(c(t(pred), recursive=TRUE), probs=probs))
+  
+  if (is.null(display_xlim)) {
+    display_xlim <- range(xs)
+  }
+  
+  if (is.null(display_ylim)) {
+    display_ylim <- c(min(cred[1,]), max(cred[9,]))
+  }
+  
+  plot(1, type="n", main=title,
+    xlim=display_xlim, xlab=x_name,
+    ylim=display_ylim, ylab=y_name)
+  
+  polygon(c(xs, rev(xs)), c(cred[1,], rev(cred[9,])),
+    col = c_light, border = NA)
+  polygon(c(xs, rev(xs)), c(cred[2,], rev(cred[8,])),
+    col = c_light_highlight, border = NA)
+  polygon(c(xs, rev(xs)), c(cred[3,], rev(cred[7,])),
+    col = c_mid, border = NA)
+  polygon(c(xs, rev(xs)), c(cred[4,], rev(cred[6,])),
+    col = c_mid_highlight, border = NA)
+  lines(xs, cred[5,], col=c_dark, lwd=2)
+}
+
+par(mfrow=c(2, 1), mar = c(5, 4, 2, 1))
+
+pred_names <- grep('y_pred', names(samples), value=TRUE)
+hist_retro(dat$doy, samples, pred_names, -3.5, 1, 0.25, "y")
+
+pred_names <- grep('y_grid_pred', names(samples), value=TRUE)
+preds <- samples[pred_names]
+plot_cont_marginal_quantiles(data$x_grid, preds, 
+  title="Conditional Check", 
+  x_name="x", y_name="y",
+  display_ylim=c(-3, 1))
+points(data$x, data$y, col="white", pch=16, cex=1.2)
+points(data$x, data$y, col="black", pch=16, cex=0.8)
+
+# Marginal posterior distributions
+par(mfrow=c(1, 2), mar = c(5, 4, 2, 1)) 
+util$plot_expectand_pushforward(samples[["alpha"]], 25,
+  display_name="alpha")
+util$plot_expectand_pushforward(samples[["sigma"]], 25,
+  display_name="sigma")
+
+##########################################################################################
 # plot slope with the data:
 preSlope <- data.frame(sum[grep("beta1\\[", rownames(sum)), c("mean","2.5%", "97.5%", "n_eff", "Rhat")])
 
@@ -200,7 +232,7 @@ dev.off()
 legend("topright",legend = c("pre-1980", "post-1980"),
   col = c(col.sp[1], col.sp[2]),   bty = "n", pch = 19, cex =1.5)
 
-mdlOut <- data.frame(speciesPheno = unique(sort(final.t$sp.pheno)), 
+mdlOut <- data.frame(speciesPheno = unique(sort(dat$sp.pheno)), 
   pre1980 = preSlope$mean, 
   post1980 = postSlope$mean,
   alpha = int$mean)
@@ -217,7 +249,7 @@ row.names(mdlOut) <- mdlOut$speciesPheno
 #######################################################
 # plot the raw data and whether the model output fits
 
-dat <- subset(final.t, sp.pheno == "Acer_campestre_flowering")
+dat <- subset(dat, sp.pheno == "Acer_campestre_flowering")
 
 pm.0 <- mdlOut["Acer_campestre_flowering", "pre1980"] * min(dat$yr1980) + mdlOut["Acer_campestre_flowering", "alpha"]
 pm.1 <- mdlOut["Acer_campestre_flowering", "pre1980"] * 0 + mdlOut["Acer_campestre_flowering", "alpha"]
@@ -239,7 +271,7 @@ spPheno <- "Bupalus_piniaria_abundance"
 spPheno <- "Macoma_balthica_spawning"
 spPheno <- "Pagodroma_nivea_egg_laying"
 spPheno <- "Pseudacris_crucifer_first_appearance"
-dat <- subset(final.t, sp.pheno == spPheno)
+dat <- subset(dat, sp.pheno == spPheno)
 
 dat <- dat[order(dat$year),]
 pm.0 <- mdlOut[spPheno, "pre1980"] * min(dat$yr1980) + mdlOut[spPheno, "alpha"]

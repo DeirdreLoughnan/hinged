@@ -59,3 +59,16 @@ model {
   }
 }
 
+generated quantities {
+  real y_pred[N];
+  
+  
+  for (n in 1:N) {
+    if (x[n] <= x0) {
+      y_pred[n] = normal_rng(mu_grand + alpha_sp[species[n]] + alpha_study[study[n]] + beta1[species[n]] * (x[n] - x0), sigma);
+    } else {
+      y_pred[n] = normal_rng(mu_grand + alpha_sp[species[n]] + alpha_study[study[n]] + beta2[species[n]] * (x[n] - x0), sigma);
+    }
+  }
+  
+}
