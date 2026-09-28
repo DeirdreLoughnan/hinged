@@ -1,0 +1,96 @@
+\documentclass{article}
+
+% required 
+\usepackage[hyphens]{url} 
+\usepackage{Sweave}
+\usepackage{graphicx}
+\usepackage{natbib}
+\usepackage{amsmath}
+\usepackage{textcomp}
+\usepackage{float}
+\usepackage[utf8]{inputenc} % allow characters in citations 
+\usepackage[nottoc]{tocbibind} %should add References to the table of contents?
+\usepackage{amsmath} % making nice equations 
+\usepackage{listings} % add in stan code
+\usepackage{xcolor}
+\usepackage{capt-of}%allows me to set a caption for code in appendix 
+\usepackage[export]{adjustbox} % adding a box around a map
+\usepackage{lineno}
+\linenumbers
+\usepackage[small]{caption}
+\usepackage{longtable}
+
+\usepackage{xr-hyper} %refer to Fig.s in another document
+\usepackage{hyperref}
+
+\setlength{\captionmargin}{30pt}
+\setlength{\abovecaptionskip}{0pt}
+\setlength{\belowcaptionskip}{10pt}
+
+% optional: change spacing
+\topmargin -1.5cm        
+\oddsidemargin 0.5cm   
+\evensidemargin 0.5cm  
+\textwidth 15.59cm
+\textheight 21.94cm 
+% \renewcommand{\baselinestretch}{1.5} % 1.5 lines between lines
+\parindent 0pt		  % sets leading space for paragraphs
+
+\usepackage{xr-hyper} %refer to Fig.s in another document
+%\graphicspath{ {./DoseResponse_WriteupImages/} }% tell latex where to find photos 
+% \externaldocument{traitPhenoSM}
+
+%%% end preambling. %%%
+
+\begin{document}
+
+\renewcommand{\bibname}{References}%names reference list 
+
+\SweaveOpts{concordance=TRUE} % For RStudio hiccups
+
+\title{Traits predict forest phenological responses to photoperiod more than temperature} 
+
+\author{Deirdre Loughnan$^1$, Michael Betancourt$^2$, and E M Wolkovich$^{1,3,4}$}
+\date{} 
+\maketitle 
+
+\section*{Introduction}
+\begin{itemize}
+\item Species phenologies are advancing with climate change:
+\begin{itemize}
+\item Decades of phenological research---fingerprint of climate change
+\item Overall advances---highly variable
+\item Generally assume that prior to climate change species phenologies were stable---but rarely is this actually tested
+\end{itemize}
+\item Summary of phenological research to date:
+\begin{itemize}
+\item P
+\end{itemize}
+\item Knowing whether phenologies were shifting even pre-climate change is valuable = could provide insights into whether recent shifts are additive, with other pre-existing factors (e.g. changes in landscape use) or likely the direct response to recent factors. 
+\item Here we use long-term time series with that include data prior to 1980 to test the rate and direction of shifts in species phenologies differ from pre-climate change trends
+\end{itemize}
+
+\section*{Methods}
+\begin{itemize}
+\item Use a subset of data from Loughnan et al. (2024)---subset time series with data prior to 1980
+\begin{itemize}
+\item Final dataset includes X time series and includes data for X species, spanning X types of phenological events
+\item Time series vary in length from X to X years---with the longest spanning from X to X and the shortest from X to X---on average they are X years long
+\item A total of X individual observations
+\end{itemize}
+\item Builds on previous Bayesian hierarchical model to individually estimate shifts in phenology before and after 1980
+\end{itemize}
+
+\section*{Results}
+\begin{itemize}
+\item Overall phenologies prior to 1980 shifted at a rate of X
+\item Post-1980 phenologies shift at a rate of X
+\item Prior to climate change, X\% of species were experiencing no change in phenology, but X\% were advancing and X\% delaying
+
+\item Where the species that were delaying still delaying post 1980?
+\item How did the rate of species that were advancing change post climate change?
+\end{itemize}
+
+\section*{Discussion}
+
+\end{document}

@@ -1,0 +1,294 @@
+# started Aug 22, by D. Loughnan
+# aim of this code is to perform the posterior predictive checks on the hing model
+rm(list = ls()) 
+options(mc.cores = parallel::detectCores())
+options(stringsAsFactors = FALSE)
+
+#library(colormap)
+# library(phytools)
+# library(ape)
+require(rstan)
+# require(caper)
+require(shinystan)
+require(reshape2)
+library(stringr)
+library(ggplot2)
+library(plyr)
+library(dplyr)
+library(bayesplot)
+library(posterior)
+library(gridExtra)
+
+setwd("~/Documents/github/hinged")
+
+dat <- read.csv("analyses/input/synchronyData.csv")
+
+load("analyses/output/hingeSpeciesStudyYpred_yPred.Rda")
+sum <- summary(mdlStudyY)$summary
+
+slopes <- sum[c("mu_beta1", "mu_grand", "mu_beta2","sigma_sp","sigma_study", "sigma_b1", "sigma_b2", "sigma"), c("mean","2.5%", "97.5%", "n_eff", "Rhat")]
+
+slopes
+
+
+# ESS low
+##########################################################################################
+# mikes utility plots and diagnostics
+util <- new.env()
+source('analyses/stan_utility_rstan.R', local=util)
+source('analyses/mcmc_visualization_tools.R', local=util)
+
+diagnostics <- util$extract_hmc_diagnostics(mdlStudyY)
+util$check_all_hmc_diagnostics(diagnostics)
+# All Hamiltonian Monte Carlo diagnostics are consistent with reliable Markov chain Monte Carlo.
+
+samples <- util$extract_expectands(mdlStudyY)
+util$check_all_expectand_diagnostics(samples)# All expectands checked appear to be behaving well enough for reliable Markov chain Monte Carlo estimation.
+
+hist(sum[,"Rhat"])
+# Retrodictive checks
+hist_retro <- function(obs, samples, pred_names,
+                       bin_min, bin_max, delta,
+                       xlab="", display_ylim=NULL, title="") {
+  if (is.na(bin_min)) bin_min <- min(pred)
+  if (is.na(bin_max)) bin_max <- max(pred)
+  breaks <- seq(bin_min, bin_max, delta)
+  B <- length(breaks) - 1
+  idx <- rep(1:B, each=2)
+  xs <- sapply(1:length(idx),
+               function(b) if(b %% 2 == 0) breaks[idx[b] + 1]
+               else                        breaks[idx[b]] )
+  obs_counts <- hist(obs[bin_min < obs & obs < bin_max], breaks=breaks, plot=FALSE)$counts
+  pad_obs_counts <- do.call(cbind,
+                            lapply(idx, function(n) obs_counts[n]))
+  pred <- sapply(pred_names,
+                 function(name) c(t(samples[[name]]), recursive=TRUE))
+  N <- dim(pred)[1]
+  pred_counts <- sapply(1:N,
+                        function(n) hist(pred[n,][bin_min < pred[n,] & pred[n,] < bin_max],
+                                         breaks=breaks,
+                                         plot=FALSE)$counts)
+  probs = c(0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9)
+  cred <- sapply(1:B,
+                 function(b) quantile(pred_counts[b,], probs=probs))
+  pad_cred <- do.call(cbind, lapply(idx, function(n) cred[1:9, n]))
+  
+  if (is.null(display_ylim)) {
+    display_ylim <- c(0, max(c(obs_counts, cred[9,])))
+  }
+  
+  plot(1, type="n", main=title,
+       xlim=c(bin_min, bin_max), xlab=xlab,
+       ylim=display_ylim, ylab="Counts")
+  polygon(c(xs, rev(xs)), c(pad_cred[1,], rev(pad_cred[9,])),
+          col = c_light, border = NA)
+  polygon(c(xs, rev(xs)), c(pad_cred[2,], rev(pad_cred[8,])),
+          col = c_light_highlight, border = NA)
+  polygon(c(xs, rev(xs)), c(pad_cred[3,], rev(pad_cred[7,])),
+          col = c_mid, border = NA)
+  polygon(c(xs, rev(xs)), c(pad_cred[4,], rev(pad_cred[6,])),
+          col = c_mid_highlight, border = NA)
+  lines(xs, pad_cred[5,], col=c_dark, lwd=2)
+  lines(xs, pad_obs_counts, col="white", lty=1, lw=2.5)
+  lines(xs, pad_obs_counts, col="black", lty=1, lw=2)
+}
+
+plot_cont_marginal_quantiles <- function(xs, preds, 
+                                         display_xlim=NULL, display_ylim=NULL, 
+                                         title="", x_name="", y_name="") {
+  probs = c(0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9)
+  cred <- sapply(preds, function(pred) quantile(c(t(pred), recursive=TRUE), probs=probs))
+  
+  if (is.null(display_xlim)) {
+    display_xlim <- range(xs)
+  }
+  
+  if (is.null(display_ylim)) {
+    display_ylim <- c(min(cred[1,]), max(cred[9,]))
+  }
+  
+  plot(1, type="n", main=title,
+       xlim=display_xlim, xlab=x_name,
+       ylim=display_ylim, ylab=y_name)
+  
+  polygon(c(xs, rev(xs)), c(cred[1,], rev(cred[9,])),
+          col = c_light, border = NA)
+  polygon(c(xs, rev(xs)), c(cred[2,], rev(cred[8,])),
+          col = c_light_highlight, border = NA)
+  polygon(c(xs, rev(xs)), c(cred[3,], rev(cred[7,])),
+          col = c_mid, border = NA)
+  polygon(c(xs, rev(xs)), c(cred[4,], rev(cred[6,])),
+          col = c_mid_highlight, border = NA)
+  lines(xs, cred[5,], col=c_dark, lwd=2)
+}
+
+###########################################################################
+par(mfrow=c(2, 1), mar = c(5, 4, 2, 1))
+
+pred_names <- grep('y_pred', names(samples), value=TRUE)
+hist_retro(dat$doy, samples, pred_names, -3.5, 1, 0.25, "y")
+
+# pred_names <- grep('y_grid_pred', names(samples), value=TRUE)
+preds <- samples[pred_names]
+plot_cont_marginal_quantiles(data$x_grid, preds, 
+                             title="Conditional Check", 
+                             x_name="x", y_name="y",
+                             display_ylim=c(-3, 1))
+points(data$x, data$y, col="white", pch=16, cex=1.2)
+points(data$x, data$y, col="black", pch=16, cex=0.8)
+
+# Marginal posterior distributions
+par(mfrow=c(1, 2), mar = c(5, 4, 2, 1)) 
+util$plot_expectand_pushforward(samples[["mu_grand"]], 25,
+                                display_name="mu_grand")
+util$plot_expectand_pushforward(samples[["mu_beta1"]], 25,
+                                display_name="mu_beta2")
+util$plot_expectand_pushforward(samples[["mu_beta2"]], 25,
+                                display_name="mu_beta2")
+util$plot_expectand_pushforward(samples[["sigma"]], 25,
+                                display_name="sigma")
+util$plot_expectand_pushforward(samples[["sigma_b1"]], 25,
+                                display_name="sigma")
+util$plot_expectand_pushforward(samples[["sigma_b2"]], 25,
+                                display_name="sigma")
+util$plot_expectand_pushforward(samples[["sigma_sp"]], 25,
+                                display_name="sigma_sp")
+util$plot_expectand_pushforward(samples[["sigma_study"]], 25,
+                                display_name="sigma_study")
+##########################################################################################
+post <- rstan::extract(mdlStudyY)
+par(mfrow=c(1,1), mar = c(4,4,1,1))
+# histograms
+plot(hist(post$mu_grand), col=rgb(0,0,1,1/4), xlim = c(-50, 500))
+hist(rnorm(1000, 188,50), col=rgb(1,0,1,1/4), add = T)
+
+plot(hist(post$mu_beta1), col=rgb(0,0,1,1/4), xlim = c(-50,50))
+hist(rnorm(1000, 0, 10), col=rgb(1,0,1,1/4), add = T)
+
+plot(hist(post$mu_beta2), col=rgb(0,0,1,1/4), xlim = c(-50,50))
+hist(rnorm(1000, 0, 10), col=rgb(1,0,1,1/4), add = T)
+
+plot(hist(post$sigma_sp), col=rgb(0,0,1,1/4), xlim = c(-500,500))
+hist(rnorm(1000, 0, 50), col=rgb(1,0,1,1/4), add = T)
+
+plot(hist(post$sigma_study), col=rgb(0,0,1,1/4), xlim = c(-500,500))
+hist(rnorm(1000, 0, 50), col=rgb(1,0,1,1/4), add = T)
+
+plot(hist(post$sigma_b1), col=rgb(0,0,1,1/4), xlim = c(-50,50))
+hist(rnorm(1000, 0, 10), col=rgb(1,0,1,1/4), add = T)
+
+plot(hist(post$sigma_b2), col=rgb(0,0,1,1/4), xlim = c(-50,50))
+hist(rnorm(1000, 0, 10), col=rgb(1,0,1,1/4), add = T)
+
+plot(hist(post$sigma), col=rgb(0,0,1,1/4), xlim = c(-50,50))
+hist(rnorm(1000, 0, 10), col=rgb(1,0,1,1/4), add = T)
+
+y <- dat$doy
+y.ext <- post$y_pred
+
+pdf(file = "analyses/figures/mdl_densityplotSpStudy.pdf", width = 4, height = 4)
+# par(mfrow = c(1,2))
+ppc_dens_overlay(y, y.ext[1:1000, ])
+dev
+##########################################################################################
+# plot slope with the data:
+preSlope <- data.frame(sum[grep("beta1\\[", rownames(sum)), c("mean","2.5%", "97.5%", "n_eff", "Rhat")])
+
+postSlope <- data.frame(sum[grep("beta2\\[", rownames(sum)), c("mean","2.5%", "97.5%", "n_eff", "Rhat")])
+
+int <- data.frame(sum[grep("alpha\\[", rownames(sum)), c("mean","2.5%", "97.5%", "n_eff", "Rhat")])
+
+col.sp <- c(rgb(204 / 255, 102 / 255, 119 / 255, alpha = 0.8), rgb(68 / 255, 170 / 255, 153 / 255, alpha = 0.5))
+
+pdf("analyses/figures/post_pre1980_hist.pdf", width = 5, height = 5)
+hist(preSlope$mean*10, col = col.sp[2], main = NA, breaks = 20, ylim = c(0, 800), xaxt = "n", yaxt = "n",
+     xlab = "Shift in phenology (days/decade)",
+     ylab = "Posterior bin probability")
+hist(postSlope$mean*10, col = col.sp[1], main = NA, breaks = 25, add = T)
+axis(side = 1, at = seq(-38,30, by = 10), tcl = -.5, cex.axis = 0.9)
+axis(side = 2, at = seq(-100, 800, by = 100), tcl = -.5, las = 1, cex.axis = 0.9)
+abline(v = 0,  lty = 2, lwd = 3)
+
+legend("topleft",legend = c(expression("Pre 1980"),  
+                            expression("Post 1980")
+                           ),
+       col = c("black", "black", "black", "black","black", "black","black"),
+       #pt.bg = c("#042333ff","#cc6a70ff","#593d9cff","#f9b641ff","#13306dff","#efe350ff","#eb8055ff"),
+       pt.bg = c( col.sp[2],
+                  col.sp[1]),
+       inset = 0.02, pch = c(21, 21), cex = 2, bty = "n")
+dev.off()
+
+legend("topright",legend = c("pre-1980", "post-1980"),
+       col = c(col.sp[1], col.sp[2]),   bty = "n", pch = 19, cex =1.5)
+
+mdlOut <- data.frame(speciesPheno = unique(sort(dat$sp.pheno)), 
+                     pre1980 = preSlope$mean, 
+                     post1980 = postSlope$mean,
+                     alpha = int$mean)
+
+pdf("analyses/figures/post_pre1980Diff.pdf", width = 5, height = 5)
+hist((mdlOut$post1980-mdlOut$pre1980), main = NA)
+dev.off()
+
+# top three biggest changes pre-post climate change are all amphibians
+
+mdlOut$diff <- mdlOut$post1980-mdlOut$pre1980
+row.names(mdlOut) <- mdlOut$speciesPheno
+
+#######################################################
+# plot the raw data and whether the model output fits
+
+dat <- subset(dat, sp.pheno == "Acer_campestre_flowering")
+
+pm.0 <- mdlOut["Acer_campestre_flowering", "pre1980"] * min(dat$yr1980) + mdlOut["Acer_campestre_flowering", "alpha"]
+pm.1 <- mdlOut["Acer_campestre_flowering", "pre1980"] * 0 + mdlOut["Acer_campestre_flowering", "alpha"]
+
+pm.2 <- mdlOut["Acer_campestre_flowering", "post1980"] * 0 + mdlOut["Acer_campestre_flowering", "alpha"]
+pm.3 <- mdlOut["Acer_campestre_flowering", "post1980"] * max(dat$yr1980) + mdlOut["Acer_campestre_flowering", "alpha"]
+
+pdf("analyses/figures/Acer_campestre_2hinge.pdf", width =3, height = 3)
+plot(doy~year, data = dat, type="l", ylim = c(100,200), col = "darkslategrey", ylab = "Day of year", xlab = "Year", cex = 3,lwd =2, main = paste("Acer_campestre_flowering", round(mdlOut["Acer_campestre_flowering", "pre1980"],3),  round(mdlOut["Acer_campestre_flowering", "post1980"],3), sep = "_" ))
+points(doy~year, data=dat, cex=0.6, col = "darkslategrey", pch =19)
+abline((lm(doy~year, data=dat)), lty =2,lwd =2)
+segments(x0 = min(dat$year), x1 = 1980, y0 = pm.0, y1 = pm.1 ,lwd =2)
+segments(x0 = 1980, x1 = max(dat$year), y0 = pm.2, y1 = pm.3,lwd =2)
+dev.off()
+
+
+### 
+spPheno <- "Bupalus_piniaria_abundance"
+spPheno <- "Macoma_balthica_spawning"
+spPheno <- "Pagodroma_nivea_egg_laying"
+spPheno <- "Pseudacris_crucifer_first_appearance"
+dat <- subset(dat, sp.pheno == spPheno)
+
+dat <- dat[order(dat$year),]
+pm.0 <- mdlOut[spPheno, "pre1980"] * min(dat$yr1980) + mdlOut[spPheno, "alpha"]
+pm.1 <- mdlOut[spPheno, "pre1980"] * 0 + mdlOut[spPheno, "alpha"]
+
+pm.2 <- mdlOut[spPheno, "post1980"] * 0 + mdlOut[spPheno, "alpha"]
+pm.3 <- mdlOut[spPheno, "post1980"] * max(dat$yr1980) + mdlOut[spPheno, "alpha"]
+
+pdf(paste("analyses/figures/", spPheno, ".pdf", sep = ""), width = 5, height = 5)
+plot(doy~year, data = dat, type="l", ylim = c(0,300), col = "darkslategrey", ylab = "Day of year", xlab = "Year", cex = 3,lwd =2, main = paste(spPheno, round(mdlOut[spPheno, "pre1980"],3),  round(mdlOut[spPheno, "post1980"],3), sep = "_" ))
+points(doy~year, data=dat, cex=0.6, col = "darkslategrey", pch =19)
+#abline((lm(doy~year, data=dat)), lty =2,lwd =2)
+segments(x0 = min(dat$year), x1 = 1980, y0 = pm.0, y1 = pm.1 ,lwd =2)
+segments(x0 = 1980, x1 = max(dat$year), y0 = pm.2, y1 = pm.3,lwd =2)
+dev.off()
+
+
+##### SP only model:
+load("analyses/output/hingeSpeciesYpred.Rda")
+sum <- summary(mdlSpY)$summary
+post <- rstan::extract(mdlSpY)
+slopes <- sum[c("mu_beta1",  "mu_beta2","sigma_sp", "sigma_b1", "sigma_b2", "sigma"), c("mean","2.5%", "97.5%", "n_eff", "Rhat")]
+
+y <- dat$doy
+y.ext <- post$y_pred
+
+pdf(file = "mdl_densityplotSp.pdf", width = 4, height = 4)
+# par(mfrow = c(1,2))
+ppc_dens_overlay(y, y.ext[1:1000, ])
+dev
