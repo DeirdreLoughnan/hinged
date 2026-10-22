@@ -91,6 +91,57 @@
 \item How did the rate of species that were advancing change post climate change?
 \end{itemize}
 
+<<label= prokLin, echo=FALSE , results= tex >>=
+require(xtable)
+require(rstan)
+quantile2575 <- function(x){
+  returnQuanilte <- quantile(x, prob = c(0.05, 0.25, 0.75,0.95))
+  return(returnQuanilte)
+}
+
+# load("..//output/mdlShan18FourParaSimple.Rdata")
+load("..//analyses/output/hingeSpeciesYpred.Rda")
+
+sumer <- summary(mdlSpY)$summary[c("mu_alpha","sigma_a","mu_beta1", "sigma_b1","mu_beta2", "sigma_b2","sigma"),
+  c("mean","n_eff", "Rhat")]
+post <- data.frame(rstan::extract(mdlSpY))
+
+fit  <-(post[, c("mu_alpha","sigma_a","mu_beta1", "sigma_b1","mu_beta2", "sigma_b2","sigma")])
+
+quant <- t(apply(fit , 2, quantile2575) )
+
+tab <- cbind(sumer, quant)
+
+tab <- tab[,c("mean","5%","25%", "75%","95%","n_eff", "Rhat")]
+print(xtable(tab, caption="Summary output from a Bayesian mixed-effects model estimating the change in phenology for all data. Provided are the mean model estimates, as well as the upper and lower limits of the 50$\\%$, and 90$\\%$ uncertainty intervals.",label = "tabAbund"),include.rownames=TRUE, caption.placement="top", hline.after=c(-1,0))
+
+@
+
+<<label= prokLin, echo=FALSE , results= tex >>=
+require(xtable)
+require(rstan)
+quantile2575 <- function(x){
+  returnQuanilte <- quantile(x, prob = c(0.05, 0.25, 0.75,0.95))
+  return(returnQuanilte)
+}
+
+# load("..//output/mdlShan18FourParaSimple.Rdata")
+load("..//analyses/output/hingeSpeciesYpred1980.Rda")
+
+sumer <- summary(mdlSpY)$summary[c("mu_alpha","sigma_a","mu_beta1", "sigma_b1","mu_beta2", "sigma_b2","sigma"),
+  c("mean","n_eff", "Rhat")]
+post <- data.frame(rstan::extract(mdlSpY))
+
+fit1980  <-(post[, c("mu_alpha","sigma_a","mu_beta1", "sigma_b1","mu_beta2", "sigma_b2","sigma")])
+
+quant <- t(apply(fit1980 , 2, quantile2575) )
+
+tab <- cbind(sumer, quant)
+
+tab1980 <- tab[,c("mean","5%","25%", "75%","95%","n_eff", "Rhat")]
+print(xtable(tab1980, caption="Summary output from a Bayesian mixed-effects model estimating the change in phenology for the subset of data with observations prior to 1980. Provided are the mean model estimates, as well as the upper and lower limits of the 50$\\%$, and 90$\\%$ uncertainty intervals.",label = "tabAbund"),include.rownames=TRUE, caption.placement="top", hline.after=c(-1,0))
+
+@
 \section*{Discussion}
 
 \end{document}

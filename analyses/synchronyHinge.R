@@ -17,66 +17,65 @@ library(ggplot2)
 library(plyr)
 library(dplyr)
 
-if(length(grep("deirdreloughnan", getwd()) > 0)) {
-  setwd("~/Documents/github/Synchrony")
-} else if(length(grep("Lizzie", getwd()) > 0)) {
-  setwd("~/Documents/git/projects/others/deirdre/Synchrony")
-} else{
-  setwd("/home/deirdre/Synchrony") # for midge
-}
+  setwd("~/Documents/github/hinged")
 
-dat <- read.csv("output/synchronyData.csv")
+  setwd("/home/deirdre/hinged") # for midge
 
-datalist <- list(N = nrow(dat),
-                        N_grid = length(unique(dat$sp.pheno)),
-                        x0 = 1980,
-                        # Nstudy = length(unique(dat$studyid)),
-                        y = dat$doy,
-                        species = dat$pheno.fact,
-                        # study = dat$study.fact,
-                        x = dat$year)
 
-mdlHinge <- 
-  stan("..//hinged/analyses/stan/fit_flex_hinge.stan",
-       data = datalist,
-       init = simu_inits,
-       iter = 4000,
-       warmup = 3000,
-       chains = 4,
-       #seed = 62921,
-       refresh = 20
-  )
+dat <- read.csv("analyses/input/synchronyData.csv")
 
-save( mdlHinge, file = "..//hinged/analyses/output/synchronyHinge.Rda")
+dat <- read.csv("synchronyData.csv")
 
-### Adding partial pooling across species
-
-datalistSp <- list(N = nrow(dat),
-  Nspp = length(unique(dat$sp.pheno)),
-  x0 = 1980,
-  Nstudy = length(unique(dat$studyid)),
-  y = dat$doy,
-  species = dat$pheno.fact,
-  # study = dat$study.fact,
-  x = dat$year)
-
-mdlSp <-
-  stan("..//hinged/analyses/stan/fit_flex_hinge_sp.stan",
-    data = datalistSp,
-    iter = 4000,
-    warmup = 3000,
-    chains = 4,
-    #seed = 62921,
-    #refresh = 20
-  )
-
-save( mdlSp, file = "..//hinged/analyses/output/synchronyHingeSpecies.Rda")
-
-sum <- summary(mdlSp)$summary
-
-slopes <- sum[c("mu_beta1", "mu_beta2","mu_alpha","sigma_a", "sigma_b1", "sigma_b2", "sigma"), c("mean","2.5%", "97.5%", "n_eff", "Rhat")]
-
-slopes
+# datalist <- list(N = nrow(dat),
+#                         N_grid = length(unique(dat$sp.pheno)),
+#                         x0 = 1980,
+#                         # Nstudy = length(unique(dat$studyid)),
+#                         y = dat$doy,
+#                         species = dat$pheno.fact,
+#                         # study = dat$study.fact,
+#                         x = dat$year)
+# 
+# mdlHinge <- 
+#   stan("analyses/stan/fit_flex_hinge.stan",
+#        data = datalist,
+#        init = simu_inits,
+#        iter = 4000,
+#        warmup = 3000,
+#        chains = 4,
+#        #seed = 62921,
+#        refresh = 20
+#   )
+# 
+# save( mdlHinge, file = "..//hinged/analyses/output/synchronyHinge.Rda")
+# 
+# ### Adding partial pooling across species
+# 
+# datalistSp <- list(N = nrow(dat),
+#   Nspp = length(unique(dat$sp.pheno)),
+#   x0 = 1980,
+#   Nstudy = length(unique(dat$studyid)),
+#   y = dat$doy,
+#   species = dat$pheno.fact,
+#   # study = dat$study.fact,
+#   x = dat$year)
+# 
+# mdlSp <-
+#   stan("..//hinged/analyses/stan/fit_flex_hinge_sp.stan",
+#     data = datalistSp,
+#     iter = 4000,
+#     warmup = 3000,
+#     chains = 4,
+#     #seed = 62921,
+#     #refresh = 20
+#   )
+# 
+# save( mdlSp, file = "..//hinged/analyses/output/synchronyHingeSpecies.Rda")
+# 
+# sum <- summary(mdlSp)$summary
+# 
+# slopes <- sum[c("mu_beta1", "mu_beta2","mu_alpha","sigma_a", "sigma_b1", "sigma_b2", "sigma"), c("mean","2.5%", "97.5%", "n_eff", "Rhat")]
+# 
+# slopes
 
 #######################################################
 ### Adding partial pooling across species and study
@@ -90,8 +89,8 @@ datalistStudy <- list(N = nrow(dat),
   study = dat$study.fact,
   x = dat$year)
 
-mdlStudy <- 
-  stan("..//hinged/analyses/stan/fit_flex_hinge_sp_study.stan",
+mdlStudyY <- 
+  stan("analyses/stan/fit_flex_hinge_sp_study.stan",
     data = datalistStudy,
     iter = 4000,
     warmup = 3000,
@@ -100,19 +99,35 @@ mdlStudy <-
     refresh = 20
   )
 
-save(mdlStudy, file = "..//hinged/analyses/output/hingeSpeciesStudyYpred.Rda")
+ssm <-  as.shinystan(mdlStudy)
+launch_shinystan(ssm)
 
-sum <- summary(mdlStudy)$summary
+save(mdlStudyY, file = "analyses/output/hingeSpeciesStudyYpred_yPred.Rda")
+
+load("analyses/output/hingeSpeciesStudyYpred_June1326.Rda")
+sum <- summary(mdlStudyY)$summary
 
 slopes <- sum[c("mu_beta1", "mu_grand", "mu_beta2","sigma_sp","sigma_study", "sigma_b1", "sigma_b2", "sigma"), c("mean","2.5%", "97.5%", "n_eff", "Rhat")]
 
 slopes
 
 # ESS low
+mdlSpY <- 
+  stan("fit_flex_hinge_sp.stan",
+       data = datalistStudy,
+       iter = 4000,
+       warmup = 3000,
+       chains = 4,
+       #seed = 62921,
+       refresh = 20
+  )
+
+save(mdlSpY, file = "analyses/output/hingeSpeciesYpred.Rda")
+
 ##########################################################################################
 # mikes utility plots and diagnostics
 util <- new.env()
-source('..//hinged/analyses/stan_utility_rstan.R', local=util)
+source('analyses/stan_utility_rstan.R', local=util)
 
 diagnostics <- util$extract_hmc_diagnostics(mdlStudy)
 util$check_all_hmc_diagnostics(diagnostics)
@@ -292,3 +307,53 @@ points(doy~year, data=dat, cex=0.6, col = "darkslategrey", pch =19)
 segments(x0 = min(dat$year), x1 = 1980, y0 = pm.0, y1 = pm.1 ,lwd =2)
 segments(x0 = 1980, x1 = max(dat$year), y0 = pm.2, y1 = pm.3,lwd =2)
 dev.off()
+
+
+################################################
+# Does the model output differ if you only use data with pre1980 data:
+
+pre1980 <- subset(dat, year < 1981)
+pre1980Study <- sort(unique(pre1980$studyid))
+
+preDat <- dat[dat$studyid %in% pre1980Study, ]
+
+datalist1980 <- list(N = nrow(preDat),
+                      Nspp = length(unique(preDat$sp.pheno)),
+                      x0 = 1980,
+                      Nstudy = length(unique(preDat$studyid)),
+                      y = preDat$doy,
+                      species = as.numeric(as.factor(as.character(preDat$pheno.fact))),
+                      study = as.numeric(as.factor(as.character(preDat$study.fact))),
+                      x = preDat$year)
+
+mdlStudy1980 <- 
+  stan("analyses/stan/fit_flex_hinge_sp_study.stan",
+       data = datalist1980,
+       iter = 4000,
+       warmup = 3000,
+       chains = 4,
+       #seed = 62921,
+       refresh = 20
+  )
+
+save(mdlStudy1980, file = "analyses/output/hingeSpeciesStudyYpred1980_yPred.Rda")
+
+load("analyses/output/hingeSpeciesStudyYpred_June1326.Rda")
+sum <- summary(mdlStudyY)$summary
+
+slopes <- sum[c("mu_beta1", "mu_grand", "mu_beta2","sigma_sp","sigma_study", "sigma_b1", "sigma_b2", "sigma"), c("mean","2.5%", "97.5%", "n_eff", "Rhat")]
+
+slopes
+
+# ESS low
+mdlSpY1980 <- 
+  stan("analyses/stan/fit_flex_hinge_sp.stan",
+       data = datalist1980,
+       iter = 4000,
+       warmup = 3000,
+       chains = 4,
+       #seed = 62921,
+       refresh = 20
+  )
+
+save(mdlSpY1980, file = "analyses/output/hingeSpeciesYpred1980.Rda")
