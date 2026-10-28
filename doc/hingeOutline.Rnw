@@ -48,26 +48,39 @@
 
 \SweaveOpts{concordance=TRUE} % For RStudio hiccups
 
-\title{Traits predict forest phenological responses to photoperiod more than temperature} 
+\title{Two better than one?} 
 
-\author{Deirdre Loughnan$^1$, Michael Betancourt$^2$, and E M Wolkovich$^{1,3,4}$}
+\author{Deirdre Loughnan$^1$, Michael Betancourt$^2$?, and E M Wolkovich$^{1,3,4}$}
 \date{} 
 \maketitle 
 
 \section*{Introduction}
 \begin{itemize}
-\item Species phenologies are advancing with climate change:
+\item What is the current state of the field? Need to move away from atribution and more towards human adaptation and how to manage these changes
+\item Species phenologies are changing with climate change
 \begin{itemize}
 \item Decades of phenological research---fingerprint of climate change
-\item Overall advances---highly variable
-\item Generally assume that prior to climate change species phenologies were stable---but rarely is this actually tested
+\item Long-term records have contributed to several large syntheses
+\item clear trends of earlier phenology---but considerable variation
 \end{itemize}
-\item Summary of phenological research to date:
+\item \item This body of research generally assumes that prior to climate change species phenologies were stable
 \begin{itemize}
-\item P
+\item Often lack pre-climate change phenology data to confirm this
+\item clear biases in where and for what taxa we have this pre-1980 data
+\item rarely has it been tested whether phenologies were shifting prior to 1980
 \end{itemize}
-\item Knowing whether phenologies were shifting even pre-climate change is valuable = could provide insights into whether recent shifts are additive, with other pre-existing factors (e.g. changes in landscape use) or likely the direct response to recent factors. 
+\item Knowing the direction or stability of phenologies' prior to climate change would provide valuable insights
+\begin{itemize}
+\item Potential insights into the drivers of species responses and mitigation strategies
+\item sp exhibiting no change prior to 1980 but earlier phenologies after suggests primary driver of this shift was recent climate change
+\item sp exhibiting advances or delays prior to 1980--may be responding to other human caused impacts--like 1. landscape  or disturbance regimes or 2. changes in biotic interactions or 3. changes in competition for resources selecting for novel species assemblages---> most likely multiple factors/threats 
+\end{itemize}
 \item Here we use long-term time series with that include data prior to 1980 to test the rate and direction of shifts in species phenologies differ from pre-climate change trends
+\begin{itemize}
+\item How were species phenologies changing prior to 1980?
+\item What potential insights can be gained by allowing sp phenologies to vary across both timescales?
+\item Do we see differences between groups of species in their pre/post responses---terrestrial vs marine, across different clades
+\end{itemize}
 \end{itemize}
 
 \section*{Methods}
@@ -79,6 +92,8 @@
 \item A total of X individual observations
 \end{itemize}
 \item Builds on previous Bayesian hierarchical model to individually estimate shifts in phenology before and after 1980
+\item Use all synchrony data; allowing two slopes to vary---compared to output if just the time-series that are pre-1980---not including phylogeny or study
+\item Note: revist excluding phylogeny if we find strong subclade differences---could just do a sub analysis with some spp overrepresented subsampled down
 \end{itemize}
 
 \section*{Results}
@@ -89,6 +104,11 @@
 
 \item Where the species that were delaying still delaying post 1980?
 \item How did the rate of species that were advancing change post climate change?
+\end{itemize}
+
+\section*{Discussion}
+\begin{itemize}
+\item We will need this approach moving forward when we finally have long-term data for more taxa
 \end{itemize}
 
 <<label= prokLin, echo=FALSE , results= tex >>=
@@ -128,9 +148,9 @@ quantile2575 <- function(x){
 # load("..//output/mdlShan18FourParaSimple.Rdata")
 load("..//analyses/output/hingeSpeciesYpred1980.Rda")
 
-sumer <- summary(mdlSpY)$summary[c("mu_alpha","sigma_a","mu_beta1", "sigma_b1","mu_beta2", "sigma_b2","sigma"),
+sumer <- summary(mdlSpY1980)$summary[c("mu_alpha","sigma_a","mu_beta1", "sigma_b1","mu_beta2", "sigma_b2","sigma"),
   c("mean","n_eff", "Rhat")]
-post <- data.frame(rstan::extract(mdlSpY))
+post <- data.frame(rstan::extract(mdlSpY1980))
 
 fit1980  <-(post[, c("mu_alpha","sigma_a","mu_beta1", "sigma_b1","mu_beta2", "sigma_b2","sigma")])
 
@@ -139,7 +159,7 @@ quant <- t(apply(fit1980 , 2, quantile2575) )
 tab <- cbind(sumer, quant)
 
 tab1980 <- tab[,c("mean","5%","25%", "75%","95%","n_eff", "Rhat")]
-print(xtable(tab1980, caption="Summary output from a Bayesian mixed-effects model estimating the change in phenology for the subset of data with observations prior to 1980. Provided are the mean model estimates, as well as the upper and lower limits of the 50$\\%$, and 90$\\%$ uncertainty intervals.",label = "tabAbund"),include.rownames=TRUE, caption.placement="top", hline.after=c(-1,0))
+print(xtable(tab1980, caption="Summary output from a Bayesian mixed-effects model estimating the change in phenology for the subset of data with observations prior to 1980 ($n_{spp}$ = 1095, $n_{dataset}$ = 110). Provided are the mean model estimates, as well as the upper and lower limits of the 50$\\%$, and 90$\\%$ uncertainty intervals.",label = "tabAbund"),include.rownames=TRUE, caption.placement="top", hline.after=c(-1,0))
 
 @
 \section*{Discussion}
